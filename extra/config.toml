@@ -301,9 +301,20 @@ max_width = 48
 # Note: Only one character is accepted.
 content_replacement_character = "*"
 
+# A fixed string to cycle through as the password mask. Overrides
+# content_replacement_character when non-empty.
+# Example: "HACK" shows "HACKHACKHAC..." as you type.
+content_replacement_string = ""
+
+# How many characters from the replacement string to output per keystroke.
+# Default 1. Set to 2 or 3 to make the displayed text grow faster than the
+# actual password length.
+content_replacement_string_chars_per_keystroke = 1
+
 # If set, each typed character is replaced by a random character from this
-# string. Overrides content_replacement_character when non-empty.
-# Example: "*.+#@$%" will randomly pick from those characters.
+# string. Overrides content_replacement_character and
+# content_replacement_string when non-empty.
+# Example: "*.+#@%" will randomly pick from those characters.
 content_replacement_characters = ""
 
 [password_field.style]

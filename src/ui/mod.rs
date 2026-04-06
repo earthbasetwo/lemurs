@@ -2,6 +2,7 @@ use log::{error, info, warn};
 
 use std::io;
 use std::sync::mpsc::channel;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
@@ -304,17 +305,24 @@ impl LoginForm {
                 ))),
                 password: Arc::new(Mutex::new(InputFieldWidget::new(
                     {
-                        let chars: Vec<char> =
+                        let random_chars: Vec<char> =
                             config.password_field.content_replacement_characters.chars().collect();
-                        if chars.is_empty() {
+                        let string_chars: Vec<char> =
+                            config.password_field.content_replacement_string.chars().collect();
+                        if !random_chars.is_empty() {
+                            InputFieldDisplayType::RandomReplace(random_chars)
+                        } else if !string_chars.is_empty() {
+                            let rate = usize::from(
+                                config.password_field.content_replacement_string_chars_per_keystroke.max(1),
+                            );
+                            InputFieldDisplayType::ReplaceString(string_chars, rate)
+                        } else {
                             InputFieldDisplayType::Replace(
                                 config
                                     .password_field
                                     .content_replacement_character
                                     .to_string(),
                             )
-                        } else {
-                            InputFieldDisplayType::RandomReplace(chars)
                         }
                     },
                     config.password_field.style.clone(),
@@ -387,6 +395,7 @@ impl LoginForm {
         let event_status_message = status_message.clone();
 
         let (req_send_channel, req_recv_channel) = channel();
+        let reveal_animating = Arc::new(AtomicBool::new(false));
         std::thread::spawn(move || {
             let mut switcher_hidden = self
                 .widgets
@@ -540,7 +549,28 @@ impl LoginForm {
                                     self.widgets.username_guard().key_press(k, modifiers)
                                 }
                                 InputMode::Password => {
-                                    self.widgets.password_guard().key_press(k, modifiers)
+                                    let result = self.widgets.password_guard().key_press(k, modifiers);
+                                    // Animate extra chars for ReplaceString mode
+                                    if self.widgets.password_guard().has_pending_reveal()
+                                        && !reveal_animating.load(Ordering::Relaxed)
+                                    {
+                                        reveal_animating.store(true, Ordering::Relaxed);
+                                        let pw = self.widgets.password.clone();
+                                        let send = req_send_channel.clone();
+                                        let animating = reveal_animating.clone();
+                                        std::thread::spawn(move || {
+                                            loop {
+                                                std::thread::sleep(Duration::from_millis(100));
+                                                let more = pw.lock()
+                                                    .map(|mut g| g.reveal_one())
+                                                    .unwrap_or(false);
+                                                let _ = send.send(UIThreadRequest::Redraw);
+                                                if !more { break; }
+                                            }
+                                            animating.store(false, Ordering::Relaxed);
+                                        });
+                                    }
+                                    result
                                 }
                                 _ => None,
                             };

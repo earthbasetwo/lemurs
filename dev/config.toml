@@ -94,11 +94,13 @@ max_width = 48
 
 [password_field]
 content_replacement_character = "*"
-content_replacement_characters = "=?#^"
+content_replacement_string = "are you seeing this? ..."
+content_replacement_string_chars_per_keystroke = 2
+content_replacement_characters = ""
 
 [password_field.style]
 show_title = true
-title = "auth"
+title = "W.A.S.T.E. ϴ◀◀"
 title_color = "$text"
 content_color = "$text"
 title_color_focused = "$accent"

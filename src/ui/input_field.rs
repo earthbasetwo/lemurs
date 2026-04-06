@@ -18,6 +18,9 @@ pub enum InputFieldDisplayType {
     Echo,
     /// Always statically show a selected character
     Replace(String),
+    /// Display a fixed string that cycles when the password exceeds its length.
+    /// Fields: (chars, chars_per_keystroke)
+    ReplaceString(Vec<char>, usize),
     /// Each character is replaced by a random pick from the pool
     RandomReplace(Vec<char>),
 }
@@ -35,6 +38,8 @@ pub struct InputFieldWidget {
     display_type: InputFieldDisplayType,
     /// Pre-chosen random replacement characters (one per content char)
     display_chars: Vec<char>,
+    /// Number of display characters not yet revealed (for typing animation)
+    reveal_pending: usize,
     style: InputFieldStyle,
 }
 
@@ -122,6 +127,7 @@ impl InputFieldWidget {
             width: 8, // Give it some initial width
             display_type,
             display_chars: Vec::new(),
+            reveal_pending: 0,
             style,
         }
     }
@@ -174,6 +180,18 @@ impl InputFieldWidget {
         replacement.repeat(cell_width)
     }
 
+    fn show_replace_string(&self, chars: &[char], chars_per_keystroke: usize) -> String {
+        let scroll = usize::from(self.scroll);
+        let width = usize::from(self.width);
+        let total = self.content.chars().count() * chars_per_keystroke;
+        let revealed = total.saturating_sub(self.reveal_pending);
+        let len = chars.len();
+
+        (scroll..usize::min(scroll + width, revealed))
+            .map(|i| chars[i % len])
+            .collect()
+    }
+
     fn show_random_replace(&self) -> String {
         let scroll = usize::from(self.scroll);
         let width = usize::from(self.width);
@@ -192,6 +210,7 @@ impl InputFieldWidget {
         match &self.display_type {
             Echo => self.show_echo(),
             Replace(s) => self.show_replace(s),
+            ReplaceString(chars, rate) => self.show_replace_string(chars, *rate),
             RandomReplace(_) => self.show_random_replace(),
         }
     }
@@ -213,6 +232,15 @@ impl InputFieldWidget {
             let pos = usize::from(self.cursor) + usize::from(self.scroll);
             self.display_chars.remove(pos);
         }
+
+        if let InputFieldDisplayType::ReplaceString(_, rate) = &self.display_type {
+            let rate = *rate;
+            if self.reveal_pending >= rate {
+                self.reveal_pending -= rate;
+            } else {
+                self.reveal_pending = 0;
+            }
+        }
     }
 
     fn delete(&mut self) {
@@ -227,6 +255,15 @@ impl InputFieldWidget {
 
         if matches!(self.display_type, InputFieldDisplayType::RandomReplace(_)) {
             self.display_chars.remove(cursor + scroll);
+        }
+
+        if let InputFieldDisplayType::ReplaceString(_, rate) = &self.display_type {
+            let rate = *rate;
+            if self.reveal_pending >= rate {
+                self.reveal_pending -= rate;
+            } else {
+                self.reveal_pending = 0;
+            }
         }
     }
 
@@ -253,13 +290,20 @@ impl InputFieldWidget {
 
         self.content.insert(index, character);
 
-        if let InputFieldDisplayType::RandomReplace(pool) = &self.display_type {
-            let pos = cursor + scroll;
-            let c = pick_weighted_random(pool, &self.display_chars, pos);
-            self.display_chars.insert(pos, c);
+        match &self.display_type {
+            InputFieldDisplayType::RandomReplace(pool) => {
+                let pos = cursor + scroll;
+                let c = pick_weighted_random(pool, &self.display_chars, pos);
+                self.display_chars.insert(pos, c);
+            }
+            InputFieldDisplayType::ReplaceString(_, rate) if *rate > 1 => {
+                self.reveal_pending += *rate;
+            }
+            _ => {}
         }
 
-        if self.cursor == self.width - 1 {
+        let effective_width = self.width / self.display_rate();
+        if self.cursor >= effective_width.saturating_sub(1) {
             self.scroll += 1;
         } else {
             self.cursor += 1;
@@ -272,7 +316,8 @@ impl InputFieldWidget {
             return;
         }
 
-        if self.cursor == self.width - 1 {
+        let effective_width = self.width / self.display_rate();
+        if self.cursor >= effective_width.saturating_sub(1) {
             self.scroll += 1;
         } else {
             self.cursor += 1;
@@ -299,6 +344,7 @@ impl InputFieldWidget {
         self.scroll = 0;
         self.content = String::new();
         self.display_chars.clear();
+        self.reveal_pending = 0;
     }
 
     pub fn clear_before(&mut self) {
@@ -330,9 +376,10 @@ impl InputFieldWidget {
     }
 
     pub fn move_to_end(&mut self) {
-        self.cursor = (self.content.len() % (self.width as usize)) as u16;
-        self.scroll = if self.content.len() > (self.width as usize) {
-            (self.content.len() - (self.width as usize)) as u16
+        let effective_width = (self.width / self.display_rate()) as usize;
+        self.cursor = (self.content.len() % effective_width) as u16;
+        self.scroll = if self.content.len() > effective_width {
+            (self.content.len() - effective_width) as u16
         } else {
             0
         }
@@ -376,6 +423,27 @@ impl InputFieldWidget {
         block
     }
 
+    /// Reveal one pending animation character. Returns true if there are more pending.
+    pub fn reveal_one(&mut self) -> bool {
+        if self.reveal_pending > 0 {
+            self.reveal_pending -= 1;
+        }
+        self.reveal_pending > 0
+    }
+
+    /// Whether there are characters waiting to be revealed
+    pub fn has_pending_reveal(&self) -> bool {
+        self.reveal_pending > 0
+    }
+
+    /// How many display characters per content character
+    fn display_rate(&self) -> u16 {
+        match &self.display_type {
+            InputFieldDisplayType::ReplaceString(_, rate) => *rate as u16,
+            _ => 1,
+        }
+    }
+
     /// Constraint the area to the given configuration
     fn constraint_area(&self, mut area: Rect) -> Rect {
         let style = &self.style;
@@ -407,7 +475,13 @@ impl InputFieldWidget {
 
         if is_focused {
             let Rect { x, y, .. } = inner;
-            let cursor_offset = get_byte_offset_of_char_offset(&show_string, self.cursor.into());
+            let display_cursor = if self.reveal_pending > 0 {
+                // During animation, cursor follows the revealed text
+                show_string.chars().count()
+            } else {
+                usize::from(self.cursor) * usize::from(self.display_rate())
+            };
+            let cursor_offset = get_byte_offset_of_char_offset(&show_string, display_cursor);
             frame.set_cursor(x + show_string[..cursor_offset].width() as u16, y);
         }
 

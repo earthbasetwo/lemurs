@@ -350,6 +350,8 @@ toml_config_struct! { UsernameFieldConfig, PartialUsernameFieldConfig, RoughUser
 toml_config_struct! { PasswordFieldConfig, PartialPasswordFieldConfig, RoughPasswordFieldConfig,
     content_replacement_character => char,
     content_replacement_characters => String,
+    content_replacement_string => String,
+    content_replacement_string_chars_per_keystroke => u8,
     style => InputFieldStyle [PartialInputFieldStyle, RoughInputFieldStyle],
 }
 
