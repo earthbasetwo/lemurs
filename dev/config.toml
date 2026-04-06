@@ -70,6 +70,12 @@ no_envs_modifiers = ""
 no_envs_color_focused = "$accent_soft"
 no_envs_modifiers_focused = ""
 
+[status_message]
+info_color = "$accent"
+info_modifiers = ""
+error_color = "$error"
+error_modifiers = "bold"
+
 [username_field]
 remember = true
 

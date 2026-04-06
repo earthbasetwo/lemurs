@@ -255,6 +255,14 @@ no_envs_modifiers = ""
 no_envs_color_focused = "red"
 no_envs_modifiers_focused = ""
 
+[status_message]
+# Color and modifiers for info messages (e.g. "Verifying credentials")
+info_color = "yellow"
+info_modifiers = ""
+# Color and modifiers for error messages (e.g. "Authentication failed")
+error_color = "red"
+error_modifiers = ""
+
 [username_field]
 
 # Remember the username for the next time after a successful login attempt.

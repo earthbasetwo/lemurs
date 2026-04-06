@@ -5,7 +5,7 @@ use std::sync::mpsc::channel;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
-use crate::config::{Config, FocusBehaviour, SwitcherVisibility};
+use crate::config::{Config, FocusBehaviour, StatusMessageStyle, SwitcherVisibility};
 use crate::info_caching::{get_cached_information, set_cache};
 use crate::post_login::PostLoginEnvironment;
 use crate::{start_session, Hooks, StartSessionError};
@@ -347,6 +347,7 @@ impl LoginForm {
             FocusBehaviour::Password => InputMode::Password,
         });
         let status_message = LoginFormStatusMessage::new();
+        let status_message_style = self.config.status_message.clone();
         let background = self.widgets.background.clone();
         let key_menu = self.widgets.key_menu.clone();
         let environment = self.widgets.environment.clone();
@@ -365,6 +366,7 @@ impl LoginForm {
                 password.clone(),
                 input_mode.get(),
                 status_message.get(),
+                &status_message_style,
             );
         });
 
@@ -565,6 +567,7 @@ impl LoginForm {
                             password.clone(),
                             input_mode.get(),
                             status_message.get(),
+                            &status_message_style,
                         );
                     });
 
@@ -607,6 +610,7 @@ fn login_form_render<B: Backend>(
     password: Arc<Mutex<InputFieldWidget>>,
     input_mode: InputMode,
     status_message: Option<StatusMessage>,
+    status_message_style: &StatusMessageStyle,
 ) {
     background.render(frame);
     key_menu.render(frame, chunks.key_menu);
@@ -645,5 +649,5 @@ fn login_form_render<B: Backend>(
         );
 
     // Display Status Message
-    StatusMessage::render(status_message, frame, chunks.status_message);
+    StatusMessage::render(status_message, frame, chunks.status_message, status_message_style);
 }

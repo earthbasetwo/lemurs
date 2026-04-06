@@ -210,6 +210,7 @@ toml_config_struct! { Config, PartialConfig, RoughConfig,
 
     power_controls => PowerControlConfig [PartialPowerControlConfig, RoughPowerControlConfig],
     environment_switcher => SwitcherConfig [PartialSwitcherConfig, RoughSwitcherConfig],
+    status_message => StatusMessageStyle [PartialStatusMessageStyle, RoughStatusMessageStyle],
     username_field => UsernameFieldConfig [PartialUsernameFieldConfig, RoughUsernameFieldConfig],
     password_field => PasswordFieldConfig [PartialPasswordFieldConfig, RoughPasswordFieldConfig],
 
@@ -332,6 +333,13 @@ toml_config_struct! { InputFieldStyle, PartialInputFieldStyle, RoughInputFieldSt
 
     use_max_width => bool,
     max_width => u16,
+}
+
+toml_config_struct! { StatusMessageStyle, PartialStatusMessageStyle, RoughStatusMessageStyle,
+    info_color => String,
+    info_modifiers => String,
+    error_color => String,
+    error_modifiers => String,
 }
 
 toml_config_struct! { UsernameFieldConfig, PartialUsernameFieldConfig, RoughUsernameFieldConfig,

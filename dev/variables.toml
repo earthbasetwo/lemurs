@@ -16,3 +16,4 @@ text_dim        = "#1e4060"     # deep blue shadow
 # -- Accents --
 accent          = "#00d4ff"     # electric cyan
 accent_soft     = "#0088cc"     # deeper blue highlight
+error           = "#ff4444"     # red for errors

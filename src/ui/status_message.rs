@@ -1,10 +1,11 @@
 use ratatui::backend::Backend;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::Style;
 use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::auth::AuthenticationError;
+use crate::config::{get_color, get_modifiers, StatusMessageStyle};
 
 #[derive(Clone)]
 pub enum ErrorStatusMessage {
@@ -83,16 +84,19 @@ impl StatusMessage {
         matches!(self, Self::Error(_))
     }
 
-    pub fn render<B: Backend>(status: Option<Self>, frame: &mut Frame<B>, area: Rect) {
+    pub fn render<B: Backend>(status: Option<Self>, frame: &mut Frame<B>, area: Rect, style: &StatusMessageStyle) {
         if let Some(status_message) = status {
             let text: Box<str> = status_message.clone().into();
-            let widget = Paragraph::new(text.as_ref()).style(Style::default().fg(
-                if status_message.is_error() {
-                    Color::Red
-                } else {
-                    Color::Yellow
-                },
-            ));
+            let (color_str, modifiers_str) = if status_message.is_error() {
+                (&style.error_color, &style.error_modifiers)
+            } else {
+                (&style.info_color, &style.info_modifiers)
+            };
+            let mut s = Style::default().fg(get_color(color_str));
+            for m in get_modifiers(modifiers_str) {
+                s = s.add_modifier(m);
+            }
+            let widget = Paragraph::new(text.as_ref()).style(s);
 
             frame.render_widget(widget, area);
         } else {
