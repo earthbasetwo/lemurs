@@ -301,6 +301,11 @@ max_width = 48
 # Note: Only one character is accepted.
 content_replacement_character = "*"
 
+# If set, each typed character is replaced by a random character from this
+# string. Overrides content_replacement_character when non-empty.
+# Example: "*.+#@$%" will randomly pick from those characters.
+content_replacement_characters = ""
+
 [password_field.style]
 # Enables showing a title
 show_title = true

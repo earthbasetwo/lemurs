@@ -303,12 +303,20 @@ impl LoginForm {
                     String::default(),
                 ))),
                 password: Arc::new(Mutex::new(InputFieldWidget::new(
-                    InputFieldDisplayType::Replace(
-                        config
-                            .password_field
-                            .content_replacement_character
-                            .to_string(),
-                    ),
+                    {
+                        let chars: Vec<char> =
+                            config.password_field.content_replacement_characters.chars().collect();
+                        if chars.is_empty() {
+                            InputFieldDisplayType::Replace(
+                                config
+                                    .password_field
+                                    .content_replacement_character
+                                    .to_string(),
+                            )
+                        } else {
+                            InputFieldDisplayType::RandomReplace(chars)
+                        }
+                    },
                     config.password_field.style.clone(),
                     String::default(),
                 ))),

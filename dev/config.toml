@@ -25,14 +25,14 @@ hint_margin = 2
 entries = []
 
 [[power_controls.base_entries]]
-hint = "Shutdown"
+hint = "sys:halt"
 hint_color = "$text_dim"
 hint_modifiers = ""
 key = "F1"
 cmd = "systemctl poweroff -l"
 
 [[power_controls.base_entries]]
-hint = "Reboot"
+hint = "sys:cycle"
 hint_color = "$text_dim"
 hint_modifiers = ""
 key = "F2"
@@ -81,7 +81,7 @@ remember = true
 
 [username_field.style]
 show_title = true
-title = "Login"
+title = "ident"
 title_color = "$text"
 content_color = "$text"
 title_color_focused = "$accent"
@@ -94,10 +94,11 @@ max_width = 48
 
 [password_field]
 content_replacement_character = "*"
+content_replacement_characters = "=?#^"
 
 [password_field.style]
 show_title = true
-title = "Password"
+title = "auth"
 title_color = "$text"
 content_color = "$text"
 title_color_focused = "$accent"

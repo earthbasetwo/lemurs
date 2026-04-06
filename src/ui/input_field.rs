@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyModifiers};
+use rand::Rng;
 use ratatui::{
     layout::Rect,
     style::Style,
@@ -17,6 +18,8 @@ pub enum InputFieldDisplayType {
     Echo,
     /// Always statically show a selected character
     Replace(String),
+    /// Each character is replaced by a random pick from the pool
+    RandomReplace(Vec<char>),
 }
 
 #[derive(Clone)]
@@ -30,11 +33,73 @@ pub struct InputFieldWidget {
     /// Width of the InputField in cells
     width: u16,
     display_type: InputFieldDisplayType,
+    /// Pre-chosen random replacement characters (one per content char)
+    display_chars: Vec<char>,
     style: InputFieldStyle,
 }
 
 fn get_byte_offset_of_char_offset(s: &str, offset: usize) -> usize {
     s.char_indices().nth(offset).map_or(s.len(), |(i, _)| i)
+}
+
+/// Pick a random character from `pool`, weighted to avoid repeats.
+/// Streak of 2: reduced probability. Streak of 3+: blocked entirely.
+fn pick_weighted_random(pool: &[char], display_chars: &[char], pos: usize) -> char {
+    // Count how many consecutive identical chars precede `pos`
+    let prev_streak = |ch: char| -> usize {
+        let mut count = 0;
+        for i in (0..pos).rev() {
+            if display_chars[i] == ch {
+                count += 1;
+            } else {
+                break;
+            }
+        }
+        count
+    };
+
+    // Count how many consecutive identical chars follow `pos`
+    let next_streak = |ch: char| -> usize {
+        let mut count = 0;
+        for i in pos..display_chars.len() {
+            if display_chars[i] == ch {
+                count += 1;
+            } else {
+                break;
+            }
+        }
+        count
+    };
+
+    let mut rng = rand::rng();
+    let weights: Vec<f64> = pool
+        .iter()
+        .map(|&ch| {
+            let streak = prev_streak(ch) + next_streak(ch);
+            match streak {
+                0 => 1.0,
+                1 => 0.3,
+                2 => 0.05,
+                _ => 0.0,
+            }
+        })
+        .collect();
+
+    let total: f64 = weights.iter().sum();
+    if total == 0.0 {
+        // All options blocked (pool too small) — just pick uniformly
+        return pool[rng.random_range(0..pool.len())];
+    }
+
+    let mut roll: f64 = rng.random_range(0.0..total);
+    for (i, &w) in weights.iter().enumerate() {
+        roll -= w;
+        if roll <= 0.0 {
+            return pool[i];
+        }
+    }
+
+    *pool.last().unwrap()
 }
 
 impl InputFieldWidget {
@@ -56,6 +121,7 @@ impl InputFieldWidget {
             scroll: 0,
             width: 8, // Give it some initial width
             display_type,
+            display_chars: Vec::new(),
             style,
         }
     }
@@ -108,13 +174,25 @@ impl InputFieldWidget {
         replacement.repeat(cell_width)
     }
 
+    fn show_random_replace(&self) -> String {
+        let scroll = usize::from(self.scroll);
+        let width = usize::from(self.width);
+
+        self.display_chars
+            .iter()
+            .skip(scroll)
+            .take(width)
+            .collect()
+    }
+
     /// Returns what the displayed string should be
     fn show_string(&self) -> String {
-        use InputFieldDisplayType::{Echo, Replace};
+        use InputFieldDisplayType::*;
 
         match &self.display_type {
             Echo => self.show_echo(),
             Replace(s) => self.show_replace(s),
+            RandomReplace(_) => self.show_random_replace(),
         }
     }
 
@@ -130,6 +208,11 @@ impl InputFieldWidget {
 
         self.left();
         self.content.remove(index);
+
+        if matches!(self.display_type, InputFieldDisplayType::RandomReplace(_)) {
+            let pos = usize::from(self.cursor) + usize::from(self.scroll);
+            self.display_chars.remove(pos);
+        }
     }
 
     fn delete(&mut self) {
@@ -141,6 +224,10 @@ impl InputFieldWidget {
         };
 
         self.content.remove(index);
+
+        if matches!(self.display_type, InputFieldDisplayType::RandomReplace(_)) {
+            self.display_chars.remove(cursor + scroll);
+        }
     }
 
     fn insert(&mut self, character: char) {
@@ -165,6 +252,12 @@ impl InputFieldWidget {
             .map_or(self.content.len(), |(i, _)| i);
 
         self.content.insert(index, character);
+
+        if let InputFieldDisplayType::RandomReplace(pool) = &self.display_type {
+            let pos = cursor + scroll;
+            let c = pick_weighted_random(pool, &self.display_chars, pos);
+            self.display_chars.insert(pos, c);
+        }
 
         if self.cursor == self.width - 1 {
             self.scroll += 1;
@@ -205,21 +298,30 @@ impl InputFieldWidget {
         self.cursor = 0;
         self.scroll = 0;
         self.content = String::new();
+        self.display_chars.clear();
     }
 
     pub fn clear_before(&mut self) {
-        let byte_offset =
-            get_byte_offset_of_char_offset(&self.content, (self.cursor + self.scroll) as usize);
+        let char_offset = (self.cursor + self.scroll) as usize;
+        let byte_offset = get_byte_offset_of_char_offset(&self.content, char_offset);
         self.content = self.content[byte_offset..].to_string();
+
+        if matches!(self.display_type, InputFieldDisplayType::RandomReplace(_)) {
+            self.display_chars.drain(..char_offset);
+        }
 
         self.cursor = 0;
         self.scroll = 0;
     }
 
     pub fn clear_after(&mut self) {
-        let byte_offset =
-            get_byte_offset_of_char_offset(&self.content, (self.cursor + self.scroll) as usize);
+        let char_offset = (self.cursor + self.scroll) as usize;
+        let byte_offset = get_byte_offset_of_char_offset(&self.content, char_offset);
         self.content.truncate(byte_offset);
+
+        if matches!(self.display_type, InputFieldDisplayType::RandomReplace(_)) {
+            self.display_chars.truncate(char_offset);
+        }
     }
 
     pub fn move_to_begin(&mut self) {
