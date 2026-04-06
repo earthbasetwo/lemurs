@@ -1,0 +1,18 @@
+# Hacker Blue theme — cool cyan terminal aesthetic.
+#
+# Palette:
+#   Dark backgrounds, electric blues, bright cyan accents.
+
+# -- Backgrounds & base --
+bg              = "#0a0a14"     # near-black
+border          = "#1a3a5c"     # dark steel blue
+border_focused  = "#00d4ff"     # electric cyan
+
+# -- Text --
+text            = "#4a90b8"     # muted blue
+text_bright     = "#00e5ff"     # bright cyan
+text_dim        = "#1e4060"     # deep blue shadow
+
+# -- Accents --
+accent          = "#00d4ff"     # electric cyan
+accent_soft     = "#0088cc"     # deeper blue highlight
